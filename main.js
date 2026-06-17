@@ -374,13 +374,17 @@ export default {
         const now = Date.now();
         if (now - (lastAuto.get(scope) || 0) < 1500) return;
         lastAuto.set(scope, now);
+        // 본문 = 끝난 명령(+cwd) 우선 — 사람이 읽을 수 있게. 없으면 생략(pane id 같은 내부값 미노출).
+        let body;
+        if (ev.command) body = ev.cwd ? `${ev.command}  ·  ${ev.cwd}` : ev.command;
+        else if (ev.cwd) body = ev.cwd;
         void createMessage({
           to: scope,
           type: cfg.type || "push",
           pushType: "agent-turn",
           from: `turn:${ev.source}`,
           title: `턴 종료 (${ev.source})`,
-          body: ev.paneId ? `pane ${ev.paneId}` : undefined,
+          body,
           source: "turn",
         });
       }),
