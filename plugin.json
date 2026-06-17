@@ -1,0 +1,83 @@
+{
+  "spec": "soksak-spec-plugin@0.0.1",
+  "id": "soksak-plugin-mailbox",
+  "name": "메시지함",
+  "version": "0.0.1",
+  "repo": "https://github.com/soksak-ai/soksak-plugin-mailbox.git",
+  "description": "프로젝트별 메시지함 — CLI/MCP/API 로 메시지를 보내고, 푸시 알림(소리·딥링크·이미지)으로 받는다. '스스로 구독'하면 턴 종료 시 기계적으로 메시지를 받는다. 좌측 사이드바 탭에 읽지않음 표시.",
+  "entry": "main.js",
+  "permissions": [
+    "ui",
+    "commands",
+    "commands:destructive",
+    "data",
+    "notify",
+    "terminal:read"
+  ],
+  "contributes": {
+    "views": [
+      {
+        "id": "inbox",
+        "title": "메시지함",
+        "icon": "📬",
+        "placements": [
+          "sidebar-left"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "name": "send",
+        "title": "메시지 보내기"
+      },
+      {
+        "name": "list",
+        "title": "메시지 목록"
+      },
+      {
+        "name": "search",
+        "title": "메시지 검색"
+      },
+      {
+        "name": "get",
+        "title": "메시지 조회"
+      },
+      {
+        "name": "open",
+        "title": "메시지 열기(딥링크)"
+      },
+      {
+        "name": "mark-read",
+        "title": "읽음 표시"
+      },
+      {
+        "name": "delete",
+        "title": "메시지 삭제"
+      },
+      {
+        "name": "clear",
+        "title": "메시지 비우기"
+      },
+      {
+        "name": "subscribe",
+        "title": "자동 구독 켜기"
+      },
+      {
+        "name": "unsubscribe",
+        "title": "자동 구독 끄기"
+      },
+      {
+        "name": "subscriptions",
+        "title": "구독 목록"
+      },
+      {
+        "name": "export",
+        "title": "내보내기"
+      },
+      {
+        "name": "import",
+        "title": "가져오기"
+      }
+    ]
+  }
+}
