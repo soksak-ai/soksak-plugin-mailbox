@@ -2,6 +2,10 @@
 // 데이터는 코어 app.data(SQLite, CJK 검색), 실시간은 app.data.watch(크로스윈도우, 폴링 0).
 // '스스로 구독'하면 turn.ended(셸/유휴/ACP) 구독 → 턴 종료 시 기계적으로 메시지 생성.
 // 코어/다른 플러그인에 종속 0 — 오픈 capability(data/notify/events)와 오픈 토픽(turn.ended)만 소비.
+//
+// [스코프] = 프로젝트 root(폴더 경로). projectId 는 창마다 달라(같은 폴더라도) 멀티창 일관성을
+// 깨므로 스코프 키로 부적합 — root 가 창 무관 안정 식별자다. 같은 프로젝트를 여러 창에 열어도
+// 같은 메일함(같은 scope)을 본다.
 
 const COLL = "messages";
 const ID = "soksak-plugin-mailbox";
@@ -41,26 +45,30 @@ export default {
     const app = ctx.app;
     const sub = (d) => ctx.subscriptions.push(d);
 
-    const mounts = new Set(); // 프로젝트별 마운트된 인박스 뷰(data 변경/딥링크 focus 라우팅)
-    const subs = new Map(); // projectId → { enabled, source, type } (자동 구독, kv 영속 + 캐시)
-    const lastAuto = new Map(); // projectId → ts(자동 메시지 디바운스)
+    const mounts = new Set(); // 프로젝트(root)별 마운트된 인박스 뷰 — data 변경/딥링크 focus 라우팅
+    const subs = new Map(); // root → { enabled, source, type } (자동 구독, kv 영속 + 캐시)
+    const lastAuto = new Map(); // root → ts(자동 메시지 디바운스)
 
     const err = (code, message) => ({ ok: false, code, message });
-    const projectArg = (p) =>
+
+    // 스코프(root) 해석 — 명시 인자(to/scope/root) 우선, 없으면 현재 프로젝트 root.
+    // root 없는 프로젝트(P1상 드묾)는 id 폴백.
+    const scopeArg = (p) =>
       (typeof p.to === "string" && p.to) ||
       (typeof p.scope === "string" && p.scope) ||
-      (typeof p.project === "string" && p.project) ||
+      (typeof p.root === "string" && p.root) ||
+      app.project.current()?.root ||
       app.project.current()?.id ||
       null;
 
-    const deepLinkFor = (id, project) =>
+    const deepLinkFor = (id, scope) =>
       `soksak://cmd/plugin.${ID}.open?` +
-      new URLSearchParams({ id, project }).toString();
+      new URLSearchParams({ id, root: scope }).toString();
 
     // 메시지 생성(send + self-subscribe 공용). push 면 송신측 1회 알림+소리(재알림 금지).
     async function createMessage(p) {
-      const project = projectArg(p);
-      if (!project) return err("INVALID_PARAMS", "프로젝트 없음 — to 지정 또는 프로젝트에서 실행");
+      const scope = scopeArg(p);
+      if (!scope) return err("INVALID_PARAMS", "프로젝트 없음 — to 지정 또는 프로젝트에서 실행");
       if (!p.title) return err("INVALID_PARAMS", "title 필요");
       const type = p.type === "push" || p.type === "event" ? p.type : "info";
       const cat = (p.pushType && PUSH_TYPES[p.pushType]) || {};
@@ -81,7 +89,7 @@ export default {
         createdAt: Date.now(),
         source: typeof p.source === "string" ? p.source : "command",
       };
-      const id = await app.data.put(COLL, rec, { scope: project });
+      const id = await app.data.put(COLL, rec, { scope });
       if (type === "push" && app.notify) {
         await app.notify.push({
           title: rec.title,
@@ -89,17 +97,19 @@ export default {
           icon,
           image: rec.image,
           sound,
-          deepLink: rec.deepLink || deepLinkFor(id, project),
+          deepLink: rec.deepLink || deepLinkFor(id, scope),
           tag: `mailbox-${id}`,
         });
       }
-      return { ok: true, id, project };
+      // 반환 키는 messageId — top-level "id" 는 JSON-RPC 응답 봉투의 요청 id 와 충돌(코어 컨벤션:
+      // 커맨드는 bare "id" 를 반환하지 않는다 — groupId/viewId/label 식).
+      return { ok: true, messageId: id, scope };
     }
 
-    async function markRead(project, id) {
-      const rec = await app.data.get(COLL, id, { scope: project ?? undefined });
+    async function markRead(scope, id) {
+      const rec = await app.data.get(COLL, id, { scope: scope ?? undefined });
       if (rec && !rec.read) {
-        await app.data.put(COLL, { ...rec, read: true }, { scope: project ?? undefined, id });
+        await app.data.put(COLL, { ...rec, read: true }, { scope: scope ?? undefined, id });
       }
     }
 
@@ -107,20 +117,20 @@ export default {
     sub(
       app.commands.register("send", {
         description:
-          "메시지 전송(type: info|push|event). push 면 OS/인앱 알림+소리+딥링크. to=대상 프로젝트(기본 현재)",
+          "메시지 전송(type: info|push|event). push 면 OS/인앱 알림+소리+딥링크. to=대상 프로젝트 root(기본 현재)",
         params: {
           title: { type: "string", required: true, description: "제목" },
           body: { type: "string", description: "본문" },
           type: { type: "string", description: "info|push|event(기본 info)" },
           pushType: { type: "string", description: "agent-turn|alert|reminder|mention|info" },
-          to: { type: "string", description: "대상 프로젝트 id(기본 현재)" },
+          to: { type: "string", description: "대상 프로젝트 root(기본 현재)" },
           sound: { type: "string", description: "내장 default/ping/chime/success/alert 또는 경로" },
           image: { type: "string", description: "이미지 URL/경로" },
           deepLink: { type: "string", description: "클릭 시 딥링크(기본 이 메시지 열기)" },
           from: { type: "string", description: "발신자 표시" },
           data: { type: "json", description: "임의 페이로드" },
         },
-        returns: "{ id, project }",
+        returns: "{ messageId, scope }",
         examples: [
           'sok plugin.soksak-plugin-mailbox.send \'{"title":"빌드 완료","type":"push","pushType":"alert"}\'',
         ],
@@ -130,9 +140,9 @@ export default {
 
     sub(
       app.commands.register("list", {
-        description: "메시지 목록(최신순). scope=프로젝트(기본 현재), unread=true 면 안 읽은 것만",
+        description: "메시지 목록(최신순). scope=프로젝트 root(기본 현재), unread=true 면 안 읽은 것만",
         params: {
-          scope: { type: "string", description: "프로젝트 id(기본 현재)" },
+          scope: { type: "string", description: "프로젝트 root(기본 현재)" },
           unread: { type: "boolean", description: "안 읽은 것만" },
           limit: { type: "number", description: "최대 건수(기본 100)" },
           offset: { type: "number", description: "페이지네이션" },
@@ -140,10 +150,10 @@ export default {
         returns: "{ messages }",
         examples: ["sok plugin.soksak-plugin-mailbox.list"],
         handler: async (p) => {
-          const project = projectArg(p);
-          if (!project) return err("INVALID_PARAMS", "프로젝트 없음");
+          const scope = scopeArg(p);
+          if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
           const messages = await app.data.query(COLL, {
-            scope: project,
+            scope,
             where: p.unread ? { read: false } : undefined,
             order: "createdAt",
             desc: true,
@@ -157,20 +167,20 @@ export default {
 
     sub(
       app.commands.register("search", {
-        description: "메시지 CJK 전문검색(제목/본문). scope=프로젝트(기본 현재)",
+        description: "메시지 CJK 전문검색(제목/본문). scope=프로젝트 root(기본 현재)",
         params: {
           query: { type: "string", required: true, description: "검색어" },
-          scope: { type: "string", description: "프로젝트 id(기본 현재)" },
+          scope: { type: "string", description: "프로젝트 root(기본 현재)" },
           limit: { type: "number", description: "최대 건수(기본 50)" },
         },
         returns: "{ messages }",
         examples: ['sok plugin.soksak-plugin-mailbox.search \'{"query":"빌드 실패"}\''],
         handler: async (p) => {
-          const project = projectArg(p);
-          if (!project) return err("INVALID_PARAMS", "프로젝트 없음");
+          const scope = scopeArg(p);
+          if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
           if (typeof p.query !== "string") return err("INVALID_PARAMS", "query 필요");
           const messages = await app.data.search(COLL, p.query, {
-            scope: project,
+            scope,
             limit: typeof p.limit === "number" ? p.limit : undefined,
           });
           return { messages };
@@ -183,13 +193,13 @@ export default {
         description: "메시지 1개 조회",
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
-          scope: { type: "string", description: "프로젝트 id" },
+          scope: { type: "string", description: "프로젝트 root" },
         },
         returns: "{ message }",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
           const message = await app.data.get(COLL, p.id, {
-            scope: projectArg(p) ?? undefined,
+            scope: scopeArg(p) ?? undefined,
           });
           if (!message) return err("TARGET_NOT_FOUND", "메시지 없음");
           return { message };
@@ -199,21 +209,25 @@ export default {
 
     sub(
       app.commands.register("open", {
-        description: "딥링크 타깃 — 해당 프로젝트 전환·인박스 열기·메시지로 스크롤·읽음 표시",
+        description: "딥링크 타깃 — 해당 프로젝트로 전환·인박스 열기·메시지로 스크롤·읽음 표시",
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
-          project: { type: "string", description: "프로젝트 id" },
+          root: { type: "string", description: "프로젝트 root(스코프)" },
         },
         returns: "{ ok }",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
-          const project =
-            (typeof p.project === "string" && p.project) || app.project.current()?.id || null;
-          if (project) {
+          const scope = (typeof p.root === "string" && p.root) || app.project.current()?.root || null;
+          // 이 창에서 그 root 의 프로젝트 탭을 찾아 전환(projectId 는 창-로컬).
+          if (scope) {
             try {
-              await app.commands.execute("project.activate", { project });
+              const r = await app.commands.execute("project.list");
+              if (r.ok) {
+                const proj = (r.projects || []).find((x) => x.root === scope);
+                if (proj) await app.commands.execute("project.activate", { project: proj.id });
+              }
             } catch (e) {
-              console.warn("[mailbox] project.activate 실패:", e);
+              console.warn("[mailbox] 프로젝트 전환 실패:", e);
             }
           }
           try {
@@ -221,8 +235,8 @@ export default {
           } catch (e) {
             console.warn("[mailbox] openView 실패:", e);
           }
-          await markRead(project, p.id);
-          for (const m of mounts) if (m.projectId === project) m.focus(p.id);
+          await markRead(scope, p.id);
+          for (const m of mounts) if (m.scope === scope) m.focus(p.id);
           return { ok: true };
         },
       }),
@@ -234,23 +248,23 @@ export default {
         params: {
           id: { type: "string", description: "메시지 id" },
           all: { type: "boolean", description: "scope 전체 읽음" },
-          scope: { type: "string", description: "프로젝트 id(기본 현재)" },
+          scope: { type: "string", description: "프로젝트 root(기본 현재)" },
         },
         returns: "{ marked }",
         handler: async (p) => {
-          const project = projectArg(p);
+          const scope = scopeArg(p);
           if (p.all) {
             const unread = await app.data.query(COLL, {
-              scope: project,
+              scope,
               where: { read: false },
               limit: 5000,
             });
             for (const m of unread)
-              await app.data.put(COLL, { ...m, read: true }, { scope: project, id: m.id });
+              await app.data.put(COLL, { ...m, read: true }, { scope, id: m.id });
             return { marked: unread.length };
           }
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 또는 all 필요");
-          await markRead(project, p.id);
+          await markRead(scope, p.id);
           return { marked: 1 };
         },
       }),
@@ -262,13 +276,13 @@ export default {
         danger: "destructive",
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
-          scope: { type: "string", description: "프로젝트 id" },
+          scope: { type: "string", description: "프로젝트 root" },
         },
         returns: "{ deleted }",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
           const deleted = await app.data.delete(COLL, p.id, {
-            scope: projectArg(p) ?? undefined,
+            scope: scopeArg(p) ?? undefined,
           });
           return { deleted };
         },
@@ -279,38 +293,38 @@ export default {
       app.commands.register("clear", {
         description: "프로젝트 메시지 전부 삭제",
         danger: "destructive",
-        params: { scope: { type: "string", description: "프로젝트 id(기본 현재)" } },
+        params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
         returns: "{ deleted }",
         handler: async (p) => {
-          const project = projectArg(p);
-          if (!project) return err("INVALID_PARAMS", "프로젝트 없음");
-          const all = await app.data.query(COLL, { scope: project, limit: 100000 });
-          for (const m of all) await app.data.delete(COLL, m.id, { scope: project });
+          const scope = scopeArg(p);
+          if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
+          const all = await app.data.query(COLL, { scope, limit: 100000 });
+          for (const m of all) await app.data.delete(COLL, m.id, { scope });
           return { deleted: all.length };
         },
       }),
     );
 
     // ── 자동 구독(turn.ended → 자동 메시지) ──
-    const subKey = (project) => `subscribe:${project}`;
+    const subKey = (scope) => `subscribe:${scope}`;
 
     sub(
       app.commands.register("subscribe", {
         description:
           "자동 구독 켜기 — 턴 종료 시 메시지 자동 생성. source=shell|idle|acp|all(기본 shell), type=push|info",
         params: {
-          scope: { type: "string", description: "프로젝트 id(기본 현재)" },
+          scope: { type: "string", description: "프로젝트 root(기본 현재)" },
           source: { type: "string", description: "shell|idle|acp|all(기본 shell)" },
           type: { type: "string", description: "생성 메시지 타입 push|info(기본 push)" },
         },
-        returns: "{ project, source }",
+        returns: "{ scope, source }",
         handler: async (p) => {
-          const project = projectArg(p);
-          if (!project) return err("INVALID_PARAMS", "프로젝트 없음");
+          const scope = scopeArg(p);
+          if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
           const source = ["shell", "idle", "acp", "all"].includes(p.source) ? p.source : "shell";
           const cfg = { enabled: true, source, type: p.type === "info" ? "info" : "push" };
-          await app.data.kv.set(subKey(project), cfg);
-          subs.set(project, cfg);
+          await app.data.kv.set(subKey(scope), cfg);
+          subs.set(scope, cfg);
           if (source === "idle" || source === "all") {
             try {
               await app.commands.execute("turn.idleDetection", { enabled: true });
@@ -318,7 +332,7 @@ export default {
               console.warn("[mailbox] idle 감지 켜기 실패:", e);
             }
           }
-          return { project, source };
+          return { scope, source };
         },
       }),
     );
@@ -326,14 +340,14 @@ export default {
     sub(
       app.commands.register("unsubscribe", {
         description: "자동 구독 끄기",
-        params: { scope: { type: "string", description: "프로젝트 id(기본 현재)" } },
-        returns: "{ project }",
+        params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
+        returns: "{ scope }",
         handler: async (p) => {
-          const project = projectArg(p);
-          if (!project) return err("INVALID_PARAMS", "프로젝트 없음");
-          await app.data.kv.delete(subKey(project));
-          subs.delete(project);
-          return { project };
+          const scope = scopeArg(p);
+          if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
+          await app.data.kv.delete(subKey(scope));
+          subs.delete(scope);
+          return { scope };
         },
       }),
     );
@@ -344,24 +358,24 @@ export default {
         params: {},
         returns: "{ subscriptions }",
         handler: () => ({
-          subscriptions: [...subs.entries()].map(([project, cfg]) => ({ project, ...cfg })),
+          subscriptions: [...subs.entries()].map(([scope, cfg]) => ({ scope, ...cfg })),
         }),
       }),
     );
 
-    // turn.ended → 구독 프로젝트에 자동 메시지(디바운스로 중복 억제). terminal:read 권한 게이트.
+    // turn.ended → 구독 프로젝트(root)에 자동 메시지(디바운스로 중복 억제). terminal:read 권한 게이트.
     sub(
       app.events.on("turn.ended", (ev) => {
-        const project = ev.projectId;
-        if (!project) return;
-        const cfg = subs.get(project);
+        const scope = ev.root;
+        if (!scope) return;
+        const cfg = subs.get(scope);
         if (!cfg || !cfg.enabled) return;
         if (cfg.source !== "all" && ev.source !== cfg.source) return;
         const now = Date.now();
-        if (now - (lastAuto.get(project) || 0) < 1500) return;
-        lastAuto.set(project, now);
+        if (now - (lastAuto.get(scope) || 0) < 1500) return;
+        lastAuto.set(scope, now);
         void createMessage({
-          to: project,
+          to: scope,
           type: cfg.type || "push",
           pushType: "agent-turn",
           from: `turn:${ev.source}`,
@@ -405,7 +419,8 @@ export default {
     sub(
       app.ui.registerView("inbox", {
         mount(el, vctx) {
-          const projectId = vctx.projectId;
+          // 스코프 = root(창 무관). root 없으면 projectId 폴백.
+          const scope = vctx.root || vctx.projectId;
           el.textContent = "";
           const style = document.createElement("style");
           style.textContent = CSS;
@@ -470,13 +485,12 @@ export default {
               x.textContent = "✕";
               x.title = "삭제";
               row.append(dot, main, x);
-              // 클릭 = 읽음(데이터 변경 → watch → 재렌더). ✕ = 삭제.
               row.addEventListener("click", () => {
-                void markRead(projectId, m.id);
+                void markRead(scope, m.id);
               });
               x.addEventListener("click", (ev) => {
                 ev.stopPropagation();
-                void app.data.delete(COLL, m.id, { scope: projectId });
+                void app.data.delete(COLL, m.id, { scope });
               });
               listEl.append(row);
             }
@@ -485,24 +499,20 @@ export default {
           const refresh = async () => {
             try {
               const msgs = searchTerm
-                ? await app.data.search(COLL, searchTerm, { scope: projectId, limit: 100 })
+                ? await app.data.search(COLL, searchTerm, { scope, limit: 100 })
                 : await app.data.query(COLL, {
-                    scope: projectId,
+                    scope,
                     order: "createdAt",
                     desc: true,
                     limit: 200,
                   });
               renderRows(msgs);
-              // 포커스 행 스크롤.
               if (focusId) {
                 const idx = msgs.findIndex((m) => m.id === focusId);
                 if (idx >= 0 && listEl.children[idx])
                   listEl.children[idx].scrollIntoView({ block: "nearest" });
               }
-              const unread = await app.data.count(COLL, {
-                scope: projectId,
-                where: { read: false },
-              });
+              const unread = await app.data.count(COLL, { scope, where: { read: false } });
               vctx.setBadge(unread);
             } catch (e) {
               console.warn("[mailbox] refresh 실패:", e);
@@ -516,7 +526,7 @@ export default {
           });
 
           const entry = {
-            projectId,
+            scope,
             refresh,
             focus: (id) => {
               focusId = id;
@@ -537,14 +547,14 @@ export default {
       }),
     );
 
-    // 데이터 변경 → 해당 프로젝트 뷰만 재질의(전 창 — 같은 프로젝트 다중 창 일관, 폴링 0).
+    // 데이터 변경 → 해당 프로젝트(root) 뷰만 재질의(전 창 — 같은 프로젝트 다중 창 일관, 폴링 0).
     sub(
       app.data.watch(COLL, undefined, (e) => {
-        for (const m of mounts) if (m.projectId === e.scope) void m.refresh();
+        for (const m of mounts) if (m.scope === e.scope) void m.refresh();
       }),
     );
 
-    // 컬렉션 정의(멱등) 후 저장된 자동 구독 로드. 순서 보장 위해 async IIFE.
+    // 컬렉션 정의(멱등) 후 저장된 자동 구독 로드.
     void (async () => {
       try {
         await app.data.define(COLL, {
@@ -556,8 +566,8 @@ export default {
         for (const k of keys) {
           const cfg = await app.data.kv.get(k);
           if (cfg && cfg.enabled) {
-            const project = k.slice("subscribe:".length);
-            subs.set(project, cfg);
+            const scope = k.slice("subscribe:".length);
+            subs.set(scope, cfg);
             if (cfg.source === "idle" || cfg.source === "all") needIdle = true;
           }
         }
@@ -568,7 +578,6 @@ export default {
             /* idle 감지 켜기 실패는 무시 — shell/acp 구독은 영향 없음 */
           }
         }
-        // 정의 직후 마운트된 뷰 1회 갱신.
         for (const m of mounts) void m.refresh();
       } catch (e) {
         console.error("[mailbox] 초기화 실패:", e);
