@@ -90,6 +90,8 @@ export default {
         source: typeof p.source === "string" ? p.source : "command",
       };
       const id = await app.data.put(COLL, rec, { scope });
+      // 발행: 외부 구독자(다른 플러그인/코어)용 이벤트 채널(창-로컬 bus). 자기 UI 는 data.watch 사용.
+      app.bus.emit("mailbox.message", { id, scope, type, from: rec.from, title: rec.title, pushType: rec.pushType });
       if (type === "push" && app.notify) {
         await app.notify.push({
           title: rec.title,
@@ -110,6 +112,7 @@ export default {
       const rec = await app.data.get(COLL, id, { scope: scope ?? undefined });
       if (rec && !rec.read) {
         await app.data.put(COLL, { ...rec, read: true }, { scope: scope ?? undefined, id });
+        app.bus.emit("mailbox.read", { id, scope });
       }
     }
 

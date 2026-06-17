@@ -182,6 +182,37 @@ async function main() {
   const exp = await m("export", {});
   ok(exp.ok && exp.jsonl.includes("크로스윈도우 E2E"), "export → 이 메일함 JSONL");
 
+  // ── R10 (opt-in E2E_IDLE): idle provider 실-PTY 검증 ──
+  // 실제 pane 에서 출력 후 무출력 → 코어 idle 감지기 → turn.ended(idle) → 자동 메시지.
+  // 실 프로젝트 root + 활성 터미널을 쓰므로(합성 scope 불가) 기본 OFF, 정리 후 복원. 터미널 점유(짧음).
+  if (process.env.E2E_IDLE) {
+    section("R10 idle 실-PTY (E2E_IDLE)");
+    const pl = await rpc("project.list");
+    const proj = (pl.projects || []).find((p) => p.active) || (pl.projects || [])[0];
+    const ROOT = proj && proj.root;
+    const tree = JSON.stringify(await rpc("state.tree"));
+    const pane = (tree.match(/"(p\d+)"/) || [])[1] || null;
+    if (!ROOT || !pane) {
+      ok(false, "idle: 활성 프로젝트 root + 터미널 pane 확보");
+    } else {
+      await m("clear", { scope: ROOT });
+      await m("subscribe", { scope: ROOT, source: "idle" });
+      await rpc("turn.idleDetection", { enabled: true, ms: 800 });
+      await rpc("term.exec", { pane, cmd: "printf zzidle-e2e; sleep 4" });
+      let fired = false;
+      for (let i = 0; i < 12 && !fired; i++) {
+        await sleep(400);
+        fired = (await m("list", { scope: ROOT })).messages.some((x) => x.title.includes("(idle)"));
+      }
+      ok(fired, "실 pane 출력→무출력 → turn.ended(idle) → 자동 메시지");
+      // 정리: sleep 인터럽트 + 구독/감지 해제 + scope 비움(원복).
+      await rpc("term.send", { pane, text: String.fromCharCode(3) }).catch(() => {}); // ctrl-c
+      await m("unsubscribe", { scope: ROOT });
+      await rpc("turn.idleDetection", { enabled: false });
+      await m("clear", { scope: ROOT });
+    }
+  }
+
   // ── teardown ──
   section("teardown");
   const cleared = await m("clear", { scope: SCOPE });

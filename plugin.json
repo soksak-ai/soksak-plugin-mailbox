@@ -37,6 +37,7 @@
       { "name": "subscriptions", "title": "구독 목록" },
       { "name": "export", "title": "내보내기" },
       { "name": "import", "title": "가져오기" }
-    ]
+    ],
+    "events": ["mailbox.message", "mailbox.read"]
   }
 }
