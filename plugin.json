@@ -78,6 +78,10 @@
         "name": "import",
         "title": "가져오기"
       }
+    ],
+    "events": [
+      "mailbox.message",
+      "mailbox.read"
     ]
   }
 }
