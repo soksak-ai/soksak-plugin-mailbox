@@ -22,7 +22,7 @@ const PUSH_TYPES = {
 
 const CSS = [
   ".skmb-root{display:flex;flex-direction:column;height:100%;font-size:12px;color:var(--fg);}",
-  ".skmb-head{padding:6px 8px;border-bottom:1px solid var(--bd-soft);}",
+  ".skmb-head{height:var(--header-h,33px);box-sizing:border-box;display:flex;align-items:center;padding:0 8px;border-bottom:1px solid var(--bd-soft);}",
   ".skmb-search{width:100%;box-sizing:border-box;padding:4px 8px;border-radius:6px;border:1px solid var(--bd-soft);background:var(--inset);color:var(--fg);font-size:12px;}",
   ".skmb-list{flex:1;overflow-y:auto;padding:4px;}",
   ".skmb-empty{color:var(--fg2);padding:10px;text-align:center;}",
