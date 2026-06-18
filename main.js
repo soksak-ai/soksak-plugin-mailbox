@@ -439,6 +439,7 @@ export default {
           searchInput.className = "skmb-search";
           searchInput.type = "text";
           searchInput.placeholder = "검색…";
+          searchInput.dataset.node = "search"; // 단일 요소 — 구조적 주소 노출(검색 입력)
           head.append(searchInput);
           const listEl = document.createElement("div");
           listEl.className = "skmb-list";
@@ -457,6 +458,14 @@ export default {
             }
           };
 
+          // node path 안정키 정제 — 세그먼트 형식(^[a-z0-9][a-z0-9.-]*$)에 맞춤. 코어 자동 id
+          // (013자리-pid-nanos)는 이미 부합하지만, import 로 들어온 임의 id(대문자/기호)도
+          // 결정적으로 매핑(인덱스 대체 아님 — 멱등)되도록 소문자화·비허용문자 '-' 치환.
+          const nodeKey = (id) => {
+            const s = String(id).toLowerCase().replace(/[^a-z0-9.-]/g, "-");
+            return /^[a-z0-9]/.test(s) ? s : "k-" + s;
+          };
+
           const renderRows = (msgs) => {
             listEl.textContent = "";
             if (!msgs.length) {
@@ -467,9 +476,11 @@ export default {
               return;
             }
             for (const m of msgs) {
+              const key = nodeKey(m.id);
               const row = document.createElement("div");
               row.className =
                 "skmb-row" + (m.read ? "" : " unread") + (m.id === focusId ? " focus" : "");
+              row.dataset.node = "msg/" + key; // 동적 목록 — 안정키=메시지 id(읽음 클릭 대상)
               const dot = document.createElement("span");
               dot.className = "skmb-dot";
               const main = document.createElement("div");
@@ -491,6 +502,7 @@ export default {
               x.className = "skmb-x";
               x.textContent = "✕";
               x.title = "삭제";
+              x.dataset.node = "del/" + key; // 동적 목록 — 안정키=메시지 id(삭제 클릭 대상)
               row.append(dot, main, x);
               row.addEventListener("click", () => {
                 void markRead(scope, m.id);

@@ -38,6 +38,11 @@
       { "name": "export", "title": "내보내기" },
       { "name": "import", "title": "가져오기" }
     ],
+    "nodes": [
+      { "id": "search", "description": "검색 입력 필드" },
+      { "id": "msg", "description": "메시지 행(클릭 시 읽음 표시)" },
+      { "id": "del", "description": "메시지 삭제 버튼" }
+    ],
     "events": ["mailbox.message", "mailbox.read"]
   }
 }
