@@ -462,7 +462,7 @@ export default {
             if (!msgs.length) {
               const empty = document.createElement("div");
               empty.className = "skmb-empty";
-              empty.textContent = searchTerm ? "검색 결과 없음" : "메시지 없음";
+              empty.textContent = searchTerm ? "검색 결과가 없습니다" : "메시지가 없습니다";
               listEl.append(empty);
               return;
             }
