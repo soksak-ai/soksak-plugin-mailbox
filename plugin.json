@@ -30,13 +30,13 @@
       { "name": "get", "title": "메시지 조회" },
       { "name": "open", "title": "메시지 열기(딥링크)" },
       { "name": "mark-read", "title": "읽음 표시" },
-      { "name": "delete", "title": "메시지 삭제" },
-      { "name": "clear", "title": "메시지 비우기" },
+      { "name": "delete", "title": "메시지 삭제", "danger": "destructive" },
+      { "name": "clear", "title": "메시지 비우기", "danger": "destructive" },
       { "name": "subscribe", "title": "자동 구독 켜기" },
       { "name": "unsubscribe", "title": "자동 구독 끄기" },
       { "name": "subscriptions", "title": "구독 목록" },
       { "name": "export", "title": "내보내기" },
-      { "name": "import", "title": "가져오기" }
+      { "name": "import", "title": "가져오기", "danger": "destructive" }
     ],
     "nodes": [
       { "id": "search", "description": "검색 입력 필드" },
