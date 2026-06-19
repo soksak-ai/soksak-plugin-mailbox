@@ -52,11 +52,13 @@
       },
       {
         "name": "delete",
-        "title": "메시지 삭제"
+        "title": "메시지 삭제",
+        "danger": "destructive"
       },
       {
         "name": "clear",
-        "title": "메시지 비우기"
+        "title": "메시지 비우기",
+        "danger": "destructive"
       },
       {
         "name": "subscribe",
@@ -76,7 +78,8 @@
       },
       {
         "name": "import",
-        "title": "가져오기"
+        "title": "가져오기",
+        "danger": "destructive"
       }
     ],
     "nodes": [
