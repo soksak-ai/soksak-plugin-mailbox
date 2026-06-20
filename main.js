@@ -51,6 +51,15 @@ export default {
 
     const err = (code, message) => ({ ok: false, code, message });
 
+    // ── i18n ─────────────────────────────────────────────────────────────────
+    const I18N = {
+      "search.placeholder": { en: "Search…",              ko: "검색…" },
+      "empty.search":       { en: "No results",           ko: "검색 결과가 없습니다" },
+      "empty.default":      { en: "No messages",          ko: "메시지가 없습니다" },
+      "delete.title":       { en: "Delete",               ko: "삭제" },
+    };
+    const t = (k) => { const s = I18N[k]; const l = app.locale ? app.locale() : "ko"; return s ? (s[l] ?? s.en ?? s.ko) : k; };
+
     // 스코프(root) 해석 — 명시 인자(to/scope/root) 우선, 없으면 현재 프로젝트 root.
     // root 없는 프로젝트(P1상 드묾)는 id 폴백.
     const scopeArg = (p) =>
@@ -451,7 +460,7 @@ export default {
           const searchInput = document.createElement("input");
           searchInput.className = "skmb-search";
           searchInput.type = "text";
-          searchInput.placeholder = "검색…";
+          searchInput.placeholder = t("search.placeholder");
           searchInput.dataset.node = "search"; // 단일 요소 — 구조적 주소 노출(검색 입력)
           head.append(searchInput);
           const listEl = document.createElement("div");
@@ -484,7 +493,7 @@ export default {
             if (!msgs.length) {
               const empty = document.createElement("div");
               empty.className = "skmb-empty";
-              empty.textContent = searchTerm ? "검색 결과가 없습니다" : "메시지가 없습니다";
+              empty.textContent = searchTerm ? t("empty.search") : t("empty.default");
               listEl.append(empty);
               return;
             }
@@ -514,7 +523,7 @@ export default {
               const x = document.createElement("button");
               x.className = "skmb-x";
               x.textContent = "✕";
-              x.title = "삭제";
+              x.title = t("delete.title");
               x.dataset.node = "del/" + key; // 동적 목록 — 안정키=메시지 id(삭제 클릭 대상)
               row.append(dot, main, x);
               row.addEventListener("click", () => {
@@ -585,6 +594,8 @@ export default {
         for (const m of mounts) if (m.scope === e.scope) void m.refresh();
       }),
     );
+    // 로케일 변경 → 마운트된 모든 인박스 뷰 재렌더(라벨·placeholder·빈상태 문자열 갱신).
+    sub(app.events.on("locale.changed", () => { for (const m of mounts) { try { m && m.refresh && m.refresh(); } catch {} } }));
 
     // 컬렉션 정의(멱등) 후 저장된 자동 구독 로드.
     void (async () => {
