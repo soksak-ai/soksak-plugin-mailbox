@@ -120,7 +120,8 @@ export default {
     sub(
       app.commands.register("send", {
         description:
-          "메시지 전송(type: info|push|event). push 면 OS/인앱 알림+소리+딥링크. to=대상 프로젝트 root(기본 현재)",
+          "Send a message to a mailbox (type: info|push|event). push triggers OS/in-app notification with sound and deep link. to=target project root (default: current).",
+        triggers: { ko: "메시지 보내기 쪽지 보내기 알림 전송 메일 발송" },
         params: {
           title: { type: "string", required: true, description: "제목" },
           body: { type: "string", description: "본문" },
@@ -143,7 +144,8 @@ export default {
 
     sub(
       app.commands.register("list", {
-        description: "메시지 목록(최신순). scope=프로젝트 root(기본 현재), unread=true 면 안 읽은 것만",
+        description: "List messages in a mailbox (newest first). scope=project root (default: current). Set unread=true to return only unread messages.",
+        triggers: { ko: "메시지 목록 읽지 않은 메시지 메일함 조회 받은 편지함" },
         params: {
           scope: { type: "string", description: "프로젝트 root(기본 현재)" },
           unread: { type: "boolean", description: "안 읽은 것만" },
@@ -170,7 +172,8 @@ export default {
 
     sub(
       app.commands.register("search", {
-        description: "메시지 CJK 전문검색(제목/본문). scope=프로젝트 root(기본 현재)",
+        description: "Full-text search messages (title and body, CJK-aware). scope=project root (default: current).",
+        triggers: { ko: "메시지 검색 쪽지 찾기 메일 검색" },
         params: {
           query: { type: "string", required: true, description: "검색어" },
           scope: { type: "string", description: "프로젝트 root(기본 현재)" },
@@ -193,7 +196,8 @@ export default {
 
     sub(
       app.commands.register("get", {
-        description: "메시지 1개 조회",
+        description: "Fetch a single message by id.",
+        triggers: { ko: "메시지 조회 쪽지 읽기 메일 가져오기" },
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
           scope: { type: "string", description: "프로젝트 root" },
@@ -212,7 +216,8 @@ export default {
 
     sub(
       app.commands.register("open", {
-        description: "딥링크 타깃 — 해당 프로젝트로 전환·인박스 열기·메시지로 스크롤·읽음 표시",
+        description: "Deep-link target — switch to the project, open the inbox view, scroll to the message, and mark it as read.",
+        triggers: { ko: "메시지 열기 딥링크 인박스 열기 메일 보기" },
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
           root: { type: "string", description: "프로젝트 root(스코프)" },
@@ -247,7 +252,8 @@ export default {
 
     sub(
       app.commands.register("mark-read", {
-        description: "읽음 표시. id 지정 또는 all=true(scope 전체)",
+        description: "Mark a message as read. Provide id for a single message or all=true to mark all messages in the scope.",
+        triggers: { ko: "읽음 표시 전체 읽음 메시지 확인 안 읽은 메시지 처리" },
         params: {
           id: { type: "string", description: "메시지 id" },
           all: { type: "boolean", description: "scope 전체 읽음" },
@@ -275,7 +281,8 @@ export default {
 
     sub(
       app.commands.register("delete", {
-        description: "메시지 삭제",
+        description: "Delete a message by id.",
+        triggers: { ko: "메시지 삭제 쪽지 지우기 메일 삭제" },
         danger: "destructive",
         params: {
           id: { type: "string", required: true, description: "메시지 id" },
@@ -294,7 +301,8 @@ export default {
 
     sub(
       app.commands.register("clear", {
-        description: "프로젝트 메시지 전부 삭제",
+        description: "Delete all messages in the project mailbox. Use with caution — this is irreversible.",
+        triggers: { ko: "메시지 전체 삭제 메일함 비우기 받은 편지함 초기화" },
         danger: "destructive",
         params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
         returns: "{ deleted }",
@@ -314,7 +322,8 @@ export default {
     sub(
       app.commands.register("subscribe", {
         description:
-          "자동 구독 켜기 — 턴 종료 시 메시지 자동 생성. source=shell|idle|acp|all(기본 shell), type=push|info",
+          "Enable auto-subscription — creates a message automatically when a turn ends. source=shell|idle|acp|all (default shell), type=push|info.",
+        triggers: { ko: "자동 구독 켜기 턴 종료 알림 설정 자동 메시지 활성화" },
         params: {
           scope: { type: "string", description: "프로젝트 root(기본 현재)" },
           source: { type: "string", description: "shell|idle|acp|all(기본 shell)" },
@@ -342,7 +351,8 @@ export default {
 
     sub(
       app.commands.register("unsubscribe", {
-        description: "자동 구독 끄기",
+        description: "Disable auto-subscription for the project mailbox.",
+        triggers: { ko: "자동 구독 끄기 턴 종료 알림 해제 자동 메시지 비활성화" },
         params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
         returns: "{ scope }",
         handler: async (p) => {
@@ -357,7 +367,8 @@ export default {
 
     sub(
       app.commands.register("subscriptions", {
-        description: "자동 구독 목록",
+        description: "List all active auto-subscriptions.",
+        triggers: { ko: "구독 목록 자동 구독 현황 메시지 구독 조회" },
         params: {},
         returns: "{ subscriptions }",
         handler: () => ({
@@ -396,7 +407,8 @@ export default {
     // ── 백업/이식(코어 data.* 위임, 이 네임스페이스 한정) ──
     sub(
       app.commands.register("export", {
-        description: "이 메일함 데이터 JSONL 내보내기(백업)",
+        description: "Export all mailbox data as JSONL for backup.",
+        triggers: { ko: "메일함 내보내기 데이터 백업 메시지 추출" },
         params: {},
         returns: "{ jsonl }",
         handler: async () => {
@@ -409,7 +421,8 @@ export default {
 
     sub(
       app.commands.register("import", {
-        description: "JSONL 메일함 데이터 가져오기",
+        description: "Import mailbox data from JSONL (output of export). Existing records are overwritten by id.",
+        triggers: { ko: "메일함 가져오기 데이터 복원 메시지 임포트" },
         danger: "destructive",
         params: { jsonl: { type: "string", required: true, description: "data.export 출력" } },
         returns: "{ applied }",
