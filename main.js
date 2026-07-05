@@ -144,6 +144,7 @@ export default {
           data: { type: "json", description: "임의 페이로드" },
         },
         returns: "{ messageId, scope }",
+        message: (d) => "메시지를 보냈습니다",
         examples: [
           'sok plugin.soksak-plugin-mailbox.send \'{"title":"빌드 완료","type":"push","pushType":"alert"}\'',
         ],
@@ -162,6 +163,7 @@ export default {
           offset: { type: "number", description: "페이지네이션" },
         },
         returns: "{ messages }",
+        message: (d) => `${(d.messages ?? []).length}개`,
         examples: ["sok plugin.soksak-plugin-mailbox.list"],
         handler: async (p) => {
           const scope = scopeArg(p);
@@ -189,6 +191,7 @@ export default {
           limit: { type: "number", description: "최대 건수(기본 50)" },
         },
         returns: "{ messages }",
+        message: (d) => `${(d.messages ?? []).length}개`,
         examples: ['sok plugin.soksak-plugin-mailbox.search \'{"query":"빌드 실패"}\''],
         handler: async (p) => {
           const scope = scopeArg(p);
@@ -212,6 +215,7 @@ export default {
           scope: { type: "string", description: "프로젝트 root" },
         },
         returns: "{ message }",
+        message: (d) => d.message?.title ? `메시지를 가져왔습니다: ${d.message.title}` : "메시지를 가져왔습니다",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
           const message = await app.data.get(COLL, p.id, {
@@ -232,6 +236,7 @@ export default {
           root: { type: "string", description: "프로젝트 root(스코프)" },
         },
         returns: "{ ok }",
+        message: (d) => "메시지를 열었습니다",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
           const scope = (typeof p.root === "string" && p.root) || app.project.current()?.root || null;
@@ -269,6 +274,7 @@ export default {
           scope: { type: "string", description: "프로젝트 root(기본 현재)" },
         },
         returns: "{ marked }",
+        message: (d) => `${d.marked}개를 읽음 표시했습니다`,
         handler: async (p) => {
           const scope = scopeArg(p);
           if (p.all) {
@@ -298,6 +304,7 @@ export default {
           scope: { type: "string", description: "프로젝트 root" },
         },
         returns: "{ deleted }",
+        message: (d) => "메시지를 삭제했습니다",
         handler: async (p) => {
           if (typeof p.id !== "string") return err("INVALID_PARAMS", "id 필요");
           const deleted = await app.data.delete(COLL, p.id, {
@@ -315,6 +322,7 @@ export default {
         danger: "destructive",
         params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
         returns: "{ deleted }",
+        message: (d) => `${d.deleted}개를 삭제했습니다`,
         handler: async (p) => {
           const scope = scopeArg(p);
           if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
@@ -339,6 +347,7 @@ export default {
           type: { type: "string", description: "생성 메시지 타입 push|info(기본 push)" },
         },
         returns: "{ scope, source }",
+        message: (d) => `자동 구독을 켰습니다 (${d.source})`,
         handler: async (p) => {
           const scope = scopeArg(p);
           if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
@@ -364,6 +373,7 @@ export default {
         triggers: { ko: "자동 구독 끄기 턴 종료 알림 해제 자동 메시지 비활성화" },
         params: { scope: { type: "string", description: "프로젝트 root(기본 현재)" } },
         returns: "{ scope }",
+        message: (d) => "자동 구독을 껐습니다",
         handler: async (p) => {
           const scope = scopeArg(p);
           if (!scope) return err("INVALID_PARAMS", "프로젝트 없음");
@@ -380,6 +390,7 @@ export default {
         triggers: { ko: "구독 목록 자동 구독 현황 메시지 구독 조회" },
         params: {},
         returns: "{ subscriptions }",
+        message: (d) => `${(d.subscriptions ?? []).length}개`,
         handler: () => ({
           subscriptions: [...subs.entries()].map(([scope, cfg]) => ({ scope, ...cfg })),
         }),
@@ -420,6 +431,7 @@ export default {
         triggers: { ko: "메일함 내보내기 데이터 백업 메시지 추출" },
         params: {},
         returns: "{ jsonl }",
+        message: (d) => "메일함을 내보냈습니다",
         handler: async () => {
           const r = await app.commands.execute("data.export", { ns: ID });
           if (!r.ok) return err("INTERNAL", r.message || "export 실패");
@@ -435,6 +447,7 @@ export default {
         danger: "destructive",
         params: { jsonl: { type: "string", required: true, description: "data.export 출력" } },
         returns: "{ applied }",
+        message: (d) => `${d.applied}개를 가져왔습니다`,
         handler: async (p) => {
           if (typeof p.jsonl !== "string") return err("INVALID_PARAMS", "jsonl 필요");
           const r = await app.commands.execute("data.import", { jsonl: p.jsonl });
