@@ -113,7 +113,7 @@ export default {
         });
       }
       // 반환 키는 messageId — top-level "id" 는 JSON-RPC 응답 봉투의 요청 id 와 충돌(코어 컨벤션:
-      // 커맨드는 bare "id" 를 반환하지 않는다 — groupId/viewId/label 식).
+      // 커맨드는 bare "id" 를 반환하지 않는다 — panelId/viewId/label 식).
       return { ok: true, messageId: id, scope };
     }
 
@@ -148,6 +148,20 @@ export default {
         examples: [
           'sok plugin.soksak-plugin-mailbox.send \'{"title":"빌드 완료","type":"push","pushType":"alert"}\'',
         ],
+        // 보낸 직후 그 메시지를 확인하거나 인박스 전체를 볼 수 있음을 제시(send→get/list 사이클).
+        hint: (d) =>
+          d.ok && typeof d.messageId === "string"
+            ? [
+                {
+                  cmd: `sok plugin.soksak-plugin-mailbox.get '{"id":"${d.messageId}","scope":"${d.scope}"}'`,
+                  why: "방금 보낸 메시지를 조회할 수 있습니다",
+                },
+                {
+                  cmd: `sok plugin.soksak-plugin-mailbox.list '{"scope":"${d.scope}"}'`,
+                  why: "메일함 전체 목록을 확인할 수 있습니다",
+                },
+              ]
+            : [],
         handler: (p) => createMessage(p),
       }),
     );

@@ -155,9 +155,9 @@ async function main() {
 
   // ── R7: 크로스윈도우 단일진실(Rust DB 공유) ──
   section("R7 cross-window");
-  const win = await rpc("window.new", {});
+  const win = await rpc("window.open", {});
   const label = win.label;
-  ok(win.ok && typeof label === "string", `window.new → ${label}`);
+  ok(win.ok && typeof label === "string", `window.open → ${label}`);
   const ready = await waitWindowReady(label);
   ok(ready, "새 창 프론트 준비 완료(state.context ok)");
   // 기본 창에서 송신, 새 창 컨텍스트에서 코어 data.query 로 조회 → 동일 데이터(공유 Rust DB).
