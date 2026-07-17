@@ -1,0 +1,11 @@
+{
+  "name": "soksak-plugin-mailbox",
+  "private": true,
+  "version": "0.0.1",
+  "soksakRelease": {
+    "kind": "plugin",
+    "id": "soksak-plugin-mailbox",
+    "repository": "https://github.com/soksak-ai/soksak-plugin-mailbox",
+    "manifest": "release.json"
+  }
+}
